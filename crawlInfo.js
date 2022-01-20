@@ -2,19 +2,16 @@ const puppeteer = require('puppeteer')
 const fs = require('fs/promises')
 const urls = require('./urls.json')
 
-// const crawlImages = () => {
-//     mangaInfo.name = document.querySelector("#app > main > div.container > div.row.custom > ul > li.active > a").innerText
-//     mangaInfo.images = Array.from(document.querySelectorAll("#chapter-content > img")).map(el => el.getAttribute('data-src'))
-// }
+const USELESS_STRING_LENGTH = 39 // https://truyentranhlh.net/truyen-tranh/
 
 async function run() {
-    let listInfo = []
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
-    for (let i =0; i<urls.length; i++){
-        await page.goto(urls[i]);
-        const result = await page.evaluate(() => {
-            console.log("Crawling manga")
+    // loop through links
+    for (let link =0; link<urls.length; link++){
+        console.log("Crawling: " + urls[link])
+        await page.goto(urls[link]);
+        const [info, chapters] = await page.evaluate(() => {
             let mangaInfo = {}
             mangaInfo.name = document.querySelector(".series-name a").innerHTML;
             let tagRaw = document.querySelectorAll(".badge-info");
@@ -38,13 +35,21 @@ async function run() {
             let img = document.querySelector(".series-cover > div > div").style || '';
             mangaInfo.thumbnail = img.backgroundImage.match(/url\(["']?([^"']*)["']?\)/)[1] || '';
             mangaInfo.summary = document.querySelector("div.summary-content > p").innerText || '';
-            mangaInfo.chapters = Array.from(document.querySelectorAll(".list-chapters.at-series > a")).map(link => {
+            let chapters = Array.from(document.querySelectorAll(".list-chapters.at-series > a")).map(link => {
                 return { chapter: link.getAttribute('title'), url: link.getAttribute('href') }
             })
-            return mangaInfo
+            mangaInfo.chapters = []
+            return [mangaInfo, chapters]
         })
-        listInfo.push(result)
+        // loop through chapters
+        for (let chapterIndex = 0; chapterIndex<chapters.length; chapterIndex++){
+            console.log(`Chapter: ${chapters[chapterIndex].chapter}`)
+            await page.goto(chapters[chapterIndex].url);
+            const images = await page.evaluate( () => Array.from(document.querySelectorAll("#chapter-content > img")).map(el => el.getAttribute('data-src')))
+            info.chapters.push({name: chapters[chapterIndex].chapter, images: images})
+        }
+        fs.writeFile(`./out/${urls[link].slice(USELESS_STRING_LENGTH)}.json`, JSON.stringify(info))
     }
-    fs.writeFile('info.json', JSON.stringify(listInfo)).then(()=>browser.close())
+    browser.close()
 }
 run();
