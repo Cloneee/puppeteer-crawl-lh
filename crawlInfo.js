@@ -7,6 +7,7 @@ const USELESS_STRING_LENGTH = 39 // https://truyentranhlh.net/truyen-tranh/
 async function run() {
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
+    await page.setDefaultNavigationTimeout(0)
     // loop through links
     for (let link =0; link<urls.length; link++){
         console.log("Crawling: " + urls[link])
